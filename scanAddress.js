@@ -16,19 +16,25 @@ var RUN = false;
 // var Logger = require('./Logger.js');
 const { DynamoDBClient, CreateTableCommand, DeleteTableCommand, PutItemCommand, ListTablesCommand } = require("@aws-sdk/client-dynamodb");
 
-var INFURA_API_KEY = "";
+var INFURA_API_KEYS = [];
 const INFURA = [
-    "https://mainnet.infura.io/v3/" + INFURA_API_KEY,
-    "https://polygon-mainnet.infura.io/v3/" + INFURA_API_KEY,
-    "https://optimism-mainnet.infura.io/v3/" + INFURA_API_KEY,
-    "https://arbitrum-mainnet.infura.io/v3/" + INFURA_API_KEY,
-    "https://aurora-mainnet.infura.io/v3/" + INFURA_API_KEY,
-    "https://palm-mainnet.infura.io/v3/" + INFURA_API_KEY];
+    "https://mainnet.infura.io/v3/",
+    "https://polygon-mainnet.infura.io/v3/",
+    "https://optimism-mainnet.infura.io/v3/",
+    "https://arbitrum-mainnet.infura.io/v3/",
+    "https://aurora-mainnet.infura.io/v3/",
+    "https://palm-mainnet.infura.io/v3/"];
+// Invalid JSON RPC response: {"size":0,"timeout":0}
+var w3;
 
-var w3 = INFURA.map(link => {
-    const provider = new Web3.providers.HttpProvider(link);
-    return new Web3(provider);
-})
+function initWeb3(index = 0) {
+    w3 = INFURA.map(link => {
+        const provider = new Web3.providers.HttpProvider(link + INFURA_API_KEYS[index]);
+        return new Web3(provider);
+    });
+    w3.keyIndex = index;
+    return w3;
+}
 
 async function random_wallet(web3) {
     let private_key = ""
@@ -97,6 +103,7 @@ const deleteTables = () => {
         }).catch(err => console.log(err.message));
     });
 }
+
 var TIMEOUT_QUERY = 10;
 var count_query = 0;
 const scanWallets = (socket) => {
@@ -163,7 +170,16 @@ const scanWallets = (socket) => {
                         return a.privateKey;
                     } else
                         return 0;
-                }).catch(err => console.error("get balance error", err))
+                }).catch(err => {
+                    if (err.message == 'Invalid JSON RPC response: {"size":0,"timeout":0}')
+                        if (w3.keyIndex >= (INFURA_API_KEYS.length - 1)) {
+                            RUN = false;
+                            socket.emit("count_query", { error: "get balance error: " + err.message, RUN: false })
+                            console.error("get balance error", err);
+                        } else {
+                            initWeb3(w3.keyIndex + 1);
+                        }
+                })
             });
         })
         .then((list) => setTimeout(() => {
@@ -202,6 +218,10 @@ io.on('connection', async (socket) => {
         console.log("count_query", msg, RUN);
     });
 
+    socket.on("INFURA_API_KEYS", (msg) => {
+        console.log(msg.INFURA_API_KEYS)
+    })
+
     socket.on("goodWallets", (msg) => {
         switch (msg) {
             // case :
@@ -211,5 +231,6 @@ io.on('connection', async (socket) => {
 });
 
 server.listen(PORT, () => {
-    console.log(`http://localhost:${PORT}`)
+    console.log(`http://localhost:${PORT}`);
+    initWeb3();
 });
