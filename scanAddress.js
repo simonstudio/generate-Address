@@ -219,7 +219,9 @@ io.on('connection', async (socket) => {
     });
 
     socket.on("INFURA_API_KEYS", (msg) => {
-        console.log(msg.INFURA_API_KEYS)
+        console.log(msg.INFURA_API_KEYS);
+        INFURA_API_KEYS = msg.INFURA_API_KEYS;
+        initWeb3()
     })
 
     socket.on("goodWallets", (msg) => {
