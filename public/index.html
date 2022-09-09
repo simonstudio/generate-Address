@@ -1,0 +1,93 @@
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+
+    <script src="js/jquery.min.js"></script>
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="js/popper.min.js" crossorigin="anonymous"></script>
+    <script src="js/bootstrap.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+</head>
+
+<body>
+    <div class="container text-center">
+        <div class="row">
+            <div class="col">
+                <button type="button" class="btn btn-primary" id="btnRun">Run</button>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col">
+                <div id="count_query">s</div>
+                <div id="address">s</div>
+                <div id="private">s</div>
+            </div>
+        </div>
+        <div class="row" id="goodWallets">
+            <div class="row">
+                <div class="col address">g</div>
+                <div class="col private">g</div>
+                <div class="col balance">g</div>
+            </div>
+        </div>
+    </div>
+    <script>
+        var socket = io();
+        var STATE = {
+            RUN: false,
+            goodWallets: []
+        }
+
+        function viewGoodWallets() {
+            $('#goodWallets').html(
+                STATE.goodWallets.map(a => {
+                    return `<div class="row">
+                    <div class="col address">${a.address}</div>
+                    <div class="col private">${a.privateKey}</div>
+                    <div class="col balance">${a.balance}</div>
+                </div>`
+                }).join("\n")
+            )
+        }
+
+        $('#btnRun').click(e => {
+            if (!STATE.RUN)
+                socket.emit('count_query', "run_now");
+            else
+                socket.emit('count_query', "pause_now")
+        });
+        socket.on("connect", () => {
+            console.log("connected", socket.id);
+            socket.emit('count_query', "get_state")
+        });
+
+        socket.on("count_query", (msg) => {
+            if (msg.RUN == true) {
+                STATE.RUN = true;
+                $("#btnRun").text("PAUSE");
+                $("#btnRun").toggleClass("btn-primary btn-danger");
+            } else if (msg.RUN == false) {
+                STATE.RUN = false;
+                $("#btnRun").text("RUN");
+                $("#btnRun").toggleClass("btn-danger btn-primary")
+            }
+            console.log(msg.RUN);
+            $('#count_query').text(msg.count);
+            $('#address').text(msg.address);
+            $('#private').text(msg.privateKey);
+            $('#balance').text(msg.balance);
+        })
+
+        socket.on("goodWallets", (msg) => {
+            STATE.goodWallets.push(msg);
+            viewGoodWallets()
+        });
+    </script>
+</body>
+
+</html>
