@@ -64,7 +64,7 @@
 
         $('#postINFURA_API_KEYS').click(e => {
             socket.emit('INFURA_API_KEYS', {
-                INFURA_API_KEYS: $('#txtINFURA_API_KEYS').val().split("\n")
+                INFURA_API_KEYS: $('#txtINFURA_API_KEYS').val().split("\n").filter(v => v.trim() !== "")
             })
         });
 
@@ -109,7 +109,11 @@
         });
 
         $(document).ready(() => {
-            STATE.goodWallets = JSON.parse(localStorage.getItem('goodWallets'))
+            try {
+                STATE.goodWallets = JSON.parse(localStorage.getItem('goodWallets'));
+            } catch (error) {
+                STATE.goodWallets = []
+            }
             viewGoodWallets()
         })
 
