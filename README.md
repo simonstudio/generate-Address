@@ -1,6 +1,13 @@
 # generate-Address
-scanAddress.js
-code:
-clear &&  node --max-old-space-size=4096 scanAddress.js
 
 use amazone dynamoDB to save
+signup account aws, create DynamoDB 
+create credentials
+
+init nodejs project
+
+scanAddress.js
+
+run command:
+clear &&  node --max-old-space-size=4096 scanAddress.js
+

@@ -109,11 +109,13 @@
         });
 
         $(document).ready(() => {
-            try {
-                STATE.goodWallets = JSON.parse(localStorage.getItem('goodWallets'));
-            } catch (error) {
-                STATE.goodWallets = []
-            }
+            if (localStorage.getItem('goodWallets') !== null)
+                try {
+                    STATE.goodWallets = JSON.parse(localStorage.getItem('goodWallets'));
+                } catch (error) {
+                    console.error(error)
+                    STATE.goodWallets = []
+                }
             viewGoodWallets()
         })
 

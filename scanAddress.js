@@ -173,14 +173,21 @@ const scanWallets = (socket) => {
                     } else
                         return 0;
                 }).catch(err => {
-                    if (err.message == 'Invalid JSON RPC response: {"size":0,"timeout":0}')
+                    console.error("get balance error: ", err.message);
+
+                    if (err.message === 'Invalid JSON RPC response: {"size":0,"timeout":0}' || 
+                        err.message ==='Returned error: daily request count exceeded, request rate limited'){
                         if (w3.keyIndex >= (INFURA_API_KEYS.length - 1)) {
                             RUN = false;
-                            socket.emit("count_query", { error: "get balance error: " + err.message, RUN: false })
-                            console.error("get balance error", err);
+                            socket.emit("count_query", { error: "get balance error: " + err.message, RUN: false });                          
                         } else {
                             initWeb3(w3.keyIndex + 1);
                         }
+                    }else {
+                        console.error("get balance error: ", err.message);
+                        RUN = false;
+                        socket.emit("count_query", { error: "get balance error: " + err.message, RUN: false });                          
+                    }
                 })
             });
         })
