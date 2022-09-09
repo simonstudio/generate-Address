@@ -1,6 +1,5 @@
 // const path = require("path");
 const Web3 = require("web3");
-const tty = require('tty');
 const fs = require('fs');
 
 const express = require('express');
@@ -107,6 +106,7 @@ const deleteTables = () => {
 var TIMEOUT_QUERY = 10;
 var count_query = 0;
 const scanWallets = (socket) => {
+    // if (count_query > 1) return; // test
     if (!RUN) return;
     random_wallet(w3[0]) // {address:'0x550cd530bc893fc6d2b4df6bea587f17142ab64e', privateKey:'aaa'}
         .then(async (a) => {
@@ -132,6 +132,7 @@ const scanWallets = (socket) => {
             // });
 
             // check address balance in multichain
+            /* check balane */
             return w3.map(web3 => {
                 return web3.eth.getBalance(a.address).then(balance => {
                     // console.log(balance);
@@ -153,10 +154,11 @@ const scanWallets = (socket) => {
                         socket.emit('goodWallets', {
                             address: a.address,
                             privateKey: a.privateKey,
-                            balance: balance
+                            balance: balance,
+                            chain: (new URL(web3._provider.host)).host.split(".")[0]
                         })
 
-                        // ghi vào file
+                        // write to file
                         fs.open('walletsGoodjs.txt', "a+", (err, fd) => {
                             if (err) throw err;
                             else {
@@ -191,7 +193,7 @@ const scanWallets = (socket) => {
         })
 };
 
-/*  */
+/* server */
 
 var PORT = 3000;
 
@@ -236,3 +238,9 @@ server.listen(PORT, () => {
     console.log(`http://localhost:${PORT}`);
     initWeb3();
 });
+
+
+/* test */ 
+
+// deleteTables()
+// createTables()

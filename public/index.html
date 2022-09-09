@@ -38,6 +38,7 @@
                 <div class="col address">g</div>
                 <div class="col private">g</div>
                 <div class="col balance">g</div>
+                <div class="col chain">g</div>
             </div>
         </div>
     </div>
@@ -55,6 +56,7 @@
                     <div class="col address">${a.address}</div>
                     <div class="col private">${a.privateKey}</div>
                     <div class="col balance">${a.balance}</div>
+                    <div class="col chain">${a.chain}</div>
                 </div>`
                 }).join("\n")
             )
@@ -65,7 +67,7 @@
                 INFURA_API_KEYS: $('#txtINFURA_API_KEYS').val().split("\n")
             })
         });
-        
+
         $('#btnRun').click(e => {
             if (!STATE.RUN)
                 socket.emit('count_query', "run_now");
@@ -102,8 +104,15 @@
 
         socket.on("goodWallets", (msg) => {
             STATE.goodWallets.push(msg);
+            localStorage.setItem('goodWallets', JSON.stringify(STATE.goodWallets));
             viewGoodWallets()
         });
+
+        $(document).ready(() => {
+            STATE.goodWallets = JSON.parse(localStorage.getItem('goodWallets'))
+            viewGoodWallets()
+        })
+
     </script>
 
     <style>
