@@ -26,6 +26,20 @@ const INFURA = [
 // Invalid JSON RPC response: {"size":0,"timeout":0}
 var w3;
 
+function loadInfuraAPIKeys(pathToFile ='infurakeys.txt'){
+    return new Promise((rs,rj)=>{
+        fs.readFile(pathToFile, 'utf8', (err, data) => {
+            if (err) {
+                console.error(err);
+                rj(err);
+            }else{
+                INFURA_API_KEYS= data.split("\n").filter(v => v.trim() !== "").map(v => v.trim());
+                rs(INFURA_API_KEYS);
+            }
+        });
+    })
+}
+
 function initWeb3(index = 0) {
     w3 = INFURA.map(link => {
         const provider = new Web3.providers.HttpProvider(link + INFURA_API_KEYS[index]);
@@ -179,11 +193,11 @@ const scanWallets = (socket) => {
                         err.message ==='Returned error: daily request count exceeded, request rate limited'){
                         if (w3.keyIndex >= (INFURA_API_KEYS.length - 1)) {
                             RUN = false;
-                            socket.emit("count_query", { error: "get balance error: " + err.message, RUN: false });                          
+                            socket.emit("count_query", { error: `get balance error: ${err.message} - ${INFURA_API_KEYS[w3.keyIndex]}` , RUN: false });
                         } else {
                             initWeb3(w3.keyIndex + 1);
                         }
-                        console.error("w3 index: ", w3.keyIndex);
+                        console.error("w3 api key: ", INFURA_API_KEYS[w3.keyIndex]);
                     }else {
                         RUN = false;
                         socket.emit("count_query", { error: "get balance error: " + err.message, RUN: false });                          
@@ -228,9 +242,18 @@ io.on('connection', async (socket) => {
     });
 
     socket.on("INFURA_API_KEYS", (msg) => {
-        console.log(msg.INFURA_API_KEYS);
-        INFURA_API_KEYS = msg.INFURA_API_KEYS;
-        initWeb3()
+        if (msg.message)
+            switch( msg.message ) {
+                case "get_INFURA_API_KEYS":
+                    socket.emit("INFURA_API_KEYS", {status: 200,message: "get_INFURA_API_KEYS", data: INFURA_API_KEYS});
+                    break;
+                case "set_INFURA_API_KEYS":
+                    console.log(msg.INFURA_API_KEYS);
+                    INFURA_API_KEYS = msg.INFURA_API_KEYS;
+                    initWeb3()
+                    socket.emit("INFURA_API_KEYS", {status: 200, message: "set_INFURA_API_KEYS"});
+                    break;
+            }
     })
 
     socket.on("goodWallets", (msg) => {
@@ -243,7 +266,9 @@ io.on('connection', async (socket) => {
 
 server.listen(PORT, () => {
     console.log(`http://localhost:${PORT}`);
-    initWeb3();
+    loadInfuraAPIKeys().then((keys)=> {
+        initWeb3()
+    }) ;
 });
 
 

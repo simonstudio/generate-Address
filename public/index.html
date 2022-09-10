@@ -19,7 +19,7 @@
         <div class="row">
             <div class="col">
                 <button type="button" class="btn btn-primary" id="btnRun">Run</button>
-                <button id="postINFURA_API_KEYS">post INFURA API KEYS</button>
+                <button id="btnINFURA_API_KEYS" class="btn btn-warning">post INFURA API KEYS</button>
             </div>
         </div>
         <div class="row">
@@ -55,29 +55,12 @@
                     return `<div class="row">
                     <div class="col address">${a.address}</div>
                     <div class="col private">${a.privateKey}</div>
-                    <div class="col balance">${Math.floor(a.balance/1e18)} 💎</div>
+                    <div class="col balance">${Math.floor(a.balance / 1e18)} 💎</div>
                     <div class="col chain">${a.chain}</div>
                 </div>`
                 }).join("\n")
             )
         }
-
-        $('#postINFURA_API_KEYS').click(e => {
-            socket.emit('INFURA_API_KEYS', {
-                INFURA_API_KEYS: $('#txtINFURA_API_KEYS').val().split("\n").filter(v => v.trim() !== "")
-            })
-        });
-
-        $('#btnRun').click(e => {
-            if (!STATE.RUN)
-                socket.emit('count_query', "run_now");
-            else
-                socket.emit('count_query', "pause_now")
-        });
-        socket.on("connect", () => {
-            console.log("connected", socket.id);
-            socket.emit('count_query', "get_state")
-        });
 
         socket.on("count_query", (msg) => {
             if (msg.RUN == true) {
@@ -108,6 +91,47 @@
             viewGoodWallets()
         });
 
+        socket.on("connect", () => {
+            console.log("connected", socket.id);
+            socket.emit('count_query', "get_state")
+        });
+
+        socket.on("INFURA_API_KEYS", (msg) => {
+            if (msg.message)
+                switch (msg.message) {
+                    case "get_INFURA_API_KEYS":
+                        if (msg.status === 200) {
+                            $('#btnINFURA_API_KEYS').removeClass("btn-warning").addClass("btn-success");
+                            $('#txtINFURA_API_KEYS').val(msg.data.join("\n"));
+                        } else {
+                            $('#error').text("set INFURA_API_KEYS error").show();
+                        }
+                        break;
+                    case "set_INFURA_API_KEYS":
+                        if (msg.status === 200)
+                            $('#btnINFURA_API_KEYS').removeClass("btn-warning").addClass("btn-success");
+                        else {
+                            $('#error').text("set INFURA_API_KEYS error").show();
+                        }
+                        break;
+                }
+
+        })
+
+        $('#btnINFURA_API_KEYS').click(e => {
+            socket.emit('INFURA_API_KEYS', {
+                message: 'set_INFURA_API_KEYS',
+                INFURA_API_KEYS: $('#txtINFURA_API_KEYS').val().split("\n").filter(v => v.trim() !== "").map(v => v.trim())
+            })
+        });
+
+        $('#btnRun').click(e => {
+            if (!STATE.RUN)
+                socket.emit('count_query', "run_now");
+            else
+                socket.emit('count_query', "pause_now")
+        });
+
         $(document).ready(() => {
             if (localStorage.getItem('goodWallets') !== null)
                 try {
@@ -117,8 +141,8 @@
                     STATE.goodWallets = []
                 }
             viewGoodWallets()
+            socket.emit("INFURA_API_KEYS", { message: "get_INFURA_API_KEYS" })
         })
-
     </script>
 
     <style>
