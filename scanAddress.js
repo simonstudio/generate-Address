@@ -183,8 +183,8 @@ const scanWallets = (socket) => {
                         } else {
                             initWeb3(w3.keyIndex + 1);
                         }
+                        console.error("w3 index: ", w3.keyIndex);
                     }else {
-                        console.error("get balance error: ", err.message);
                         RUN = false;
                         socket.emit("count_query", { error: "get balance error: " + err.message, RUN: false });                          
                     }

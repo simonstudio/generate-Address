@@ -55,7 +55,7 @@
                     return `<div class="row">
                     <div class="col address">${a.address}</div>
                     <div class="col private">${a.privateKey}</div>
-                    <div class="col balance">${a.balance}</div>
+                    <div class="col balance">${Math.floor(a.balance/1e18)} 💎</div>
                     <div class="col chain">${a.chain}</div>
                 </div>`
                 }).join("\n")
