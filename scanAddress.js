@@ -117,7 +117,7 @@ const deleteTables = () => {
     });
 }
 
-var TIMEOUT_QUERY = 10;
+var TIMEOUT_QUERY = 100;
 var count_query = 0;
 const scanWallets = (socket) => {
     // if (count_query > 1) return; // test
