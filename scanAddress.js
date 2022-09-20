@@ -21,8 +21,9 @@ const INFURA = [
     "https://polygon-mainnet.infura.io/v3/",
     "https://optimism-mainnet.infura.io/v3/",
     "https://arbitrum-mainnet.infura.io/v3/",
-    "https://aurora-mainnet.infura.io/v3/",
-    "https://palm-mainnet.infura.io/v3/"];
+    // "https://aurora-mainnet.infura.io/v3/",
+    // "https://palm-mainnet.infura.io/v3/"
+];
 // Invalid JSON RPC response: {"size":0,"timeout":0}
 var w3;
 
