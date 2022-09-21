@@ -62,6 +62,10 @@
             )
         }
 
+        socket.on("DAILY_TIME_RUN", msg => {
+            console.log(msg)
+        })
+
         socket.on("count_query", (msg) => {
             if (msg.RUN == true) {
                 STATE.RUN = true;

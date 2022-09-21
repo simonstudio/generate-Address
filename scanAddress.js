@@ -1,6 +1,8 @@
 // const path = require("path");
 const Web3 = require("web3");
 const fs = require('fs');
+var {log, success, error} = require("./myStd");
+const clc = require("cli-color")
 
 const express = require('express');
 const app = express();
@@ -11,6 +13,46 @@ const io = new Server(server);
 
 
 var RUN = false;
+var DAILY_TIME_RUN = "0:00:00";
+var DAILY_TIME_RUN_FILE = "DAILY_TIME_RUN.txt";
+var socket = null;
+function socket_emit(){
+    if (socket) socket.emit(arguments);
+}
+function setDailyTimeRun(dailyTime = DAILY_TIME_RUN, file= DAILY_TIME_RUN_FILE){
+    DAILY_TIME_RUN = dailyTime;
+    fs.writeFile(file, dailyTime, {encoding: "utf8", flag: "w", mode: 0o666}, err => {
+        if (err)
+            error("setDailyTimeRun Error: ", err);
+        else {
+            fs.readFile(file, "utf8", (err, data)=>{
+                success("set file " + file + " success: " + clc.yellow(data));
+            })
+        }
+    })
+}
+function getDailyTimeRun(file = DAILY_TIME_RUN_FILE){
+    fs.readFile(file, 'utf8', function(err, dailyTime){
+        if (err)
+            error("getDailyTimeRun error: ", err);
+        else {
+            DAILY_TIME_RUN = dailyTime;
+            success(clc.yellow.bgRed(` ${dailyTime} `));
+        }
+    });
+}
+function timerRun(){
+    let timer = setInterval(()=>{
+        let now = new Date();
+        let t = `${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}`
+        if (t === DAILY_TIME_RUN){
+            success(t)
+            scanWallets(socket);
+        }
+    }, 1000)
+}
+getDailyTimeRun()
+timerRun()
 
 // var Logger = require('./Logger.js');
 const { DynamoDBClient, CreateTableCommand, DeleteTableCommand, PutItemCommand, ListTablesCommand } = require("@aws-sdk/client-dynamodb");
@@ -31,7 +73,7 @@ function loadInfuraAPIKeys(pathToFile ='infurakeys.txt'){
     return new Promise((rs,rj)=>{
         fs.readFile(pathToFile, 'utf8', (err, data) => {
             if (err) {
-                console.error(err);
+                error(err);
                 rj(err);
             }else{
                 INFURA_API_KEYS= data.split("\n").filter(v => v.trim() !== "").map(v => v.trim());
@@ -55,7 +97,7 @@ async function random_wallet(web3) {
     i = 0
     for (i = 0; i < 64; i++) {
         n = Math.floor(Math.random() * 0xf);
-        if (n > 0xf) console.log("error: n > 0xf", n);
+        if (n > 0xf) log("error: n > 0xf", n);
         private_key += n.toString(16);
     }
     let a = web3.eth.accounts.privateKeyToAccount(private_key);
@@ -102,7 +144,7 @@ const createTables = () => {
             if (!data.TableNames.includes(table)) {
                 params.TableName = table;
                 client.send(new CreateTableCommand(params)).then(result => {
-                    console.log(table, " Table Created: ", result['$metadata'].httpStatusCode == 200)
+                    log(table, " Table Created: ", result['$metadata'].httpStatusCode == 200)
                 });
             }
         })
@@ -113,19 +155,19 @@ const createTables = () => {
 const deleteTables = () => {
     ["addresses", "goodaddresses"].map(table => {
         client.send(new DeleteTableCommand({ TableName: table })).then(result => {
-            console.log(table, " Success, table deleted: ", result['$metadata'].httpStatusCode == 200);
-        }).catch(err => console.log(err.message));
+            log(table, " Success, table deleted: ", result['$metadata'].httpStatusCode == 200);
+        }).catch(err => log(err.message));
     });
 }
 
 var TIMEOUT_QUERY = 100;
 var count_query = 0;
-const scanWallets = (socket) => {
+const scanWallets = () => {
     // if (count_query > 1) return; // test
     if (!RUN) return;
     random_wallet(w3[0]) // {address:'0x550cd530bc893fc6d2b4df6bea587f17142ab64e', privateKey:'aaa'}
         .then(async (a) => {
-            socket.emit('count_query', {
+            socket_emit('count_query', {
                 count: count_query++,
                 address: a.address,
                 privateKey: a.privateKey,
@@ -138,10 +180,10 @@ const scanWallets = (socket) => {
             //     },
             // };
             // client.send(new PutItemCommand(params)).then(resultA => {
-            //     // console.log(resultA["$metadata"].httpStatusCode == 200)
+            //     // log(resultA["$metadata"].httpStatusCode == 200)
             //     TIMEOUT_QUERY = 10;
             // }).catch(err => {
-            //     console.error("Err: PutItemCommand table addresses: ", err);
+            //     error("Err: PutItemCommand table addresses: ", err);
             //     if (err.message === 'The level of configured provisioned throughput for the table was exceeded. Consider increasing your provisioning level with the UpdateTable API.')
             //         TIMEOUT_QUERY = 2000;
             // });
@@ -150,10 +192,22 @@ const scanWallets = (socket) => {
             /* check balane */
             return w3.map(web3 => {
                 return web3.eth.getBalance(a.address).then(balance => {
-                    // console.log(balance);
+                    // log(balance);
                     if (balance >= 1e18) {
                         let content = a.address + "," + a.privateKey + "\n";
-                        console.log("Good Wallets: ", content);
+                        log("Good Wallets: ", content);
+
+                        // write to file
+                        fs.open('walletsGoodjs.txt', "a+", (err, fd) => {
+                            if (err) error(err);
+                            else {
+                                fs.appendFile(fd, content, (err) => {
+                                    if (err)
+                                        error("Error:", err);
+                                });
+                            }
+                            fs.close(fd, () => { success("walletsGoodjs Saved OK"); })
+                        });
 
                         const params = {
                             TableName: "goodaddresses",
@@ -164,54 +218,44 @@ const scanWallets = (socket) => {
                         };
                         // save to database
                         client.send(new PutItemCommand(params)).then(resultG => {
-                            // console.log(resultG["$metadata"].httpStatusCode == 200);
+                            // log(resultG["$metadata"].httpStatusCode == 200);
                         });
-                        socket.emit('goodWallets', {
+                        socket_emit('goodWallets', {
                             address: a.address,
                             privateKey: a.privateKey,
                             balance: balance,
                             chain: (new URL(web3._provider.host)).host.split(".")[0]
                         })
-
-                        // write to file
-                        fs.open('walletsGoodjs.txt', "a+", (err, fd) => {
-                            if (err) throw err;
-                            else {
-                                fs.appendFile(fd, content, (err) => {
-                                    if (err)
-                                        console.error("Error:", err);
-                                });
-                            }
-                            fs.close(fd, () => { console.log("walletsGoodjs Ghi OK"); })
-                        });
                         return a.privateKey;
                     } else
                         return 0;
                 }).catch(err => {
-                    console.error("get balance error: ", err.message);
+                    error("get balance error: ", err.message);
 
                     if (err.message === 'Invalid JSON RPC response: {"size":0,"timeout":0}' || 
                         err.message ==='Returned error: daily request count exceeded, request rate limited'){
                         if (w3.keyIndex >= (INFURA_API_KEYS.length - 1)) {
+                            // when all keys exceeded, set time run again next day
+
                             RUN = false;
-                            socket.emit("count_query", { error: `get balance error: ${err.message} - ${INFURA_API_KEYS[w3.keyIndex]}` , RUN: false });
+                            socket_emit("count_query", { error: `get balance error: ${err.message} - ${INFURA_API_KEYS[w3.keyIndex]}` , RUN: false });
                         } else {
                             initWeb3(w3.keyIndex + 1);
                         }
-                        console.error("w3 api key: ", INFURA_API_KEYS[w3.keyIndex]);
+                        error("w3 api key: ", INFURA_API_KEYS[w3.keyIndex]);
                     }else {
                         RUN = false;
-                        socket.emit("count_query", { error: "get balance error: " + err.message, RUN: false });                          
+                        socket_emit("count_query", { error: "get balance error: " + err.message, RUN: false });                          
                     }
                 })
             });
         })
         .then((list) => setTimeout(() => {
-            scanWallets(socket)
+            scanWallets()
         }, TIMEOUT_QUERY))
         .catch(err => {
-            console.error("random_wallet: ", err);
-            scanWallets(socket);
+            error("random_wallet: ", err);
+            scanWallets();
         })
 };
 
@@ -221,8 +265,9 @@ var PORT = 3000;
 
 app.use(express.static('public'));
 
-io.on('connection', async (socket) => {
-    console.log('a user connected');
+io.on('connection', async (_socket) => {
+    socket = _socket
+    success('a user connected');
     socket.broadcast.emit('hi');
     socket.on("count_query", (msg) => {
         switch (msg) {
@@ -237,10 +282,22 @@ io.on('connection', async (socket) => {
                 break;
         }
         socket.emit("count_query", {
-            "RUN": RUN
+            "RUN": RUN,
+            "DAILY_TIME_RUN": DAILY_TIME_RUN
         });
-        console.log("count_query", msg, RUN);
+        log("count_query", msg, RUN);
     });
+
+    socket.on("DAILY_TIME_RUN", msg => {
+        switch (msg.command){
+            case "set":
+                setDailyTimeRun(msg.DAILY_TIME_RUN)
+                break;
+            case "get":
+                break;
+        }
+        socket.emit("DAILY_TIME_RUN", {"DAILY_TIME_RUN": DAILY_TIME_RUN})
+    })
 
     socket.on("INFURA_API_KEYS", (msg) => {
         if (msg.message)
@@ -249,7 +306,7 @@ io.on('connection', async (socket) => {
                     socket.emit("INFURA_API_KEYS", {status: 200,message: "get_INFURA_API_KEYS", data: INFURA_API_KEYS});
                     break;
                 case "set_INFURA_API_KEYS":
-                    console.log(msg.INFURA_API_KEYS);
+                    log(msg.INFURA_API_KEYS);
                     INFURA_API_KEYS = msg.INFURA_API_KEYS;
                     initWeb3()
                     socket.emit("INFURA_API_KEYS", {status: 200, message: "set_INFURA_API_KEYS"});
@@ -266,7 +323,7 @@ io.on('connection', async (socket) => {
 });
 
 server.listen(PORT, () => {
-    console.log(`http://localhost:${PORT}`);
+    log(`http://localhost:${PORT}`);
     loadInfuraAPIKeys().then((keys)=> {
         initWeb3()
     }) ;
