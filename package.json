@@ -5,6 +5,7 @@
     "bootstrap": "^5.2.1",
     "chalk": "^5.0.1",
     "cli-color": "^2.0.3",
+    "cors": "^2.8.5",
     "crash-safe-write-file": "^0.0.3",
     "express": "^4.18.1",
     "mssql": "^9.0.1",
