@@ -28,12 +28,11 @@ const COLOR = {
 
 
 const log = console.log;
-function success() {
+function logSuccess() {
     console.log(COLOR.FgGreen, Object.values(arguments).join(" "), COLOR.Reset)
 };
-function error() {
+function logError() {
     console.log(COLOR.FgRed, Object.values(arguments).join(" "), COLOR.Reset)
 };
 
-
-module.exports = { COLOR, log, success, error };
+module.exports = { COLOR, log, logSuccess, logError };

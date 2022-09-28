@@ -19,7 +19,7 @@
   "version": "1.0.0",
   "main": "jquery-3.6.1.min.js",
   "scripts": {
-    "run": "clear &&  node --max-old-space-size=4096 scanAddress.js",
+    "run": "clear &&  node --max-old-space-size=4096 scanWallets.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
