@@ -189,22 +189,23 @@ const scanWallets = () => {
                             return a.privateKey;
                         } else
                             return 0;
-                    }).catch(err => {
-                        logError("get balance error: ", err.message);
-                        RUN = false;
-                        if (err.message === 'Returned error: daily request count exceeded, request rate limited') {
-                            if (current_INFURA_API_KEYS_index >= (INFURA_API_KEYS.length - 1)) {
-                                // when all keys exceeded, set time run again next day
-                            } else {
-                                initWeb3(current_INFURA_API_KEYS_index++);
-                            }
-                            logError("INFURA_API_KEYS: ", INFURA_API_KEYS[web3s.keyIndex]);
-                        } else if (err.message === 'Invalid JSON RPC response: {"size":0,"timeout":0}') {
-                            // ioemit("count_query", { error: "get balance error: " + err.message, RUN: false });
-                        }
-
-                        ioemit("count_query", { error: `get balance error: ${err.message} - ${INFURA_API_KEYS[web3s.keyIndex]}`, RUN: RUN });
                     })
+                    // .catch(err => {
+                    //     logError("get balance error: ", err.message);
+                    //     RUN = false;
+                    //     if (err.message === 'Returned error: daily request count exceeded, request rate limited') {
+                    //         if (current_INFURA_API_KEYS_index >= (INFURA_API_KEYS.length - 1)) {
+                    //             // when all keys exceeded, set time run again next day
+                    //         } else {
+                    //             initWeb3(current_INFURA_API_KEYS_index++);
+                    //         }
+                    //         logError("INFURA_API_KEYS: ", INFURA_API_KEYS[web3s.keyIndex]);
+                    //     } else if (err.message === 'Invalid JSON RPC response: {"size":0,"timeout":0}') {
+                    //         // ioemit("count_query", { error: "get balance error: " + err.message, RUN: false });
+                    //     }
+
+                    //     ioemit("count_query", { error: `get balance error: ${err.message} - ${INFURA_API_KEYS[web3s.keyIndex]}`, RUN: RUN });
+                    // })
                 }, 100 * web3Index);
             })
         })
