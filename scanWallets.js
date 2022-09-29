@@ -23,11 +23,11 @@ const client = new DynamoDBClient({ region: "ap-southeast-1" });
 
 
 var RUN = false;
-var DAILY_TIME_RUN = "0:00:00";
+var DAILY_TIME_RUN = "0:0:0";
 var DAILY_TIME_RUN_FILE = "DAILY_TIME_RUN.txt";
 var socket = null;
 
-var TIMEOUT_QUERY = 1000;
+var TIMEOUT_QUERY = 100;
 var count_query = 0;
 
 var INFURA_API_KEYS = [];
@@ -67,31 +67,21 @@ async function random_wallet(web3) {
     return { address, privateKey };
 }
 
-function setDailyTimeRun(dailyTime = DAILY_TIME_RUN, file = DAILY_TIME_RUN_FILE) {
+async function setDailyTimeRun(dailyTime = DAILY_TIME_RUN, file = DAILY_TIME_RUN_FILE) {
     DAILY_TIME_RUN = dailyTime;
-    fs.writeFile(file, dailyTime, { encoding: "utf8", flag: "w", mode: 0o666 }, err => {
-        if (err)
-            logError("setDailyTimeRun Error: ", err);
-        else {
-            fs.readFile(file, "utf8", (err, data) => {
-                logSuccess("set file " + file + " success: " + clc.yellow(data));
-            })
-        }
-    })
+    fs.writeFileSync(file, dailyTime, { encoding: "utf8", flag: "w", mode: 0o666 })
+    logSuccess("set file " + file + " success: " + clc.yellow(dailyTime));
 }
 
-function getDailyTimeRun(file = DAILY_TIME_RUN_FILE) {
-    return new Promise((rs, rj) => {
-        fs.readFile(file, 'utf8', function (err, dailyTime) {
-            if (err) {
-                rj(err)
-            } else {
-                DAILY_TIME_RUN = dailyTime;
-                logSuccess(clc.yellow.bgRed(` ${dailyTime} `));
-                rs(DAILY_TIME_RUN)
-            }
-        });
-    })
+async function getDailyTimeRun(file = DAILY_TIME_RUN_FILE) {
+    if (!fs.existsSync(file)) {
+        await setDailyTimeRun()
+        return DAILY_TIME_RUN;
+    } else {
+        DAILY_TIME_RUN = fs.readFileSync(file, 'utf8')
+        logSuccess(clc.yellow.bgRed(` ${DAILY_TIME_RUN} `));
+        return DAILY_TIME_RUN;
+    }
 }
 
 function loadInfuraAPIKeys(pathToFile = 'infurakeys.txt') {
@@ -119,18 +109,18 @@ async function initWeb3(index = 0) {
     return web3s;
 }
 
-async function loadGoodWallets(file = "walletsGoodjs.txt") {
+async function loadGoodWallets(file = "walletsGoodjs.json") {
     let data = fs.readFileSync(file, { encoding: 'utf8', flag: 'r' });
     return data.split("\n").filter(line => line.trim() !== "").map(line => JSON.parse(line))
 }
 
 function discoveredGoodWallet(address, privateKey, balance, web3) {
-
-    let content = `{"address":"${a.address}", "privateKey": "${a.privateKey}", "chain": "${chain}"}\n`;
+    let chain = (new URL(web3._provider.host)).host.split(".")[0]
+    let content = `{"address":"${address}", "privateKey": "${privateKey}", "chain": "${chain}"}\n`;
     log("Good Wallets: ", content);
 
     // write to file
-    fs.open('walletsGoodjs.txt', "a+", (err, fd) => {
+    fs.open('walletsGoodjs.json', "a+", (err, fd) => {
         if (err) logError(err);
         else {
             fs.appendFile(fd, content, (err) => {
@@ -156,10 +146,12 @@ function discoveredGoodWallet(address, privateKey, balance, web3) {
     });
 
     ioemit('goodWallets', {
-        address: address,
-        privateKey: privateKey,
-        balance: balance,
-        chain: (new URL(web3._provider.host)).host.split(".")[0]
+        newGoodWallets: {
+            address: address,
+            privateKey: privateKey,
+            balance: balance,
+            chain: chain
+        }
     })
 }
 
@@ -184,32 +176,30 @@ const scanWallets = () => {
                     // log(web3s[web3Index]._provider.host);
                     return web3.eth.getBalance(a.address).then(balance => {
                         // log(balance);
-                        if (balance <= 1e18) {
+                        if (balance >= 1e18) {
                             discoveredGoodWallet(a.address, a.privateKey, balance, web3);
                             return a.privateKey;
                         } else
                             return 0;
-                    })
-                    // .catch(err => {
-                    //     logError("get balance error: ", err.message);
-                    //     RUN = false;
-                    //     if (err.message === 'Returned error: daily request count exceeded, request rate limited') {
-                    //         if (current_INFURA_API_KEYS_index >= (INFURA_API_KEYS.length - 1)) {
-                    //             // when all keys exceeded, set time run again next day
-                    //         } else {
-                    //             initWeb3(current_INFURA_API_KEYS_index++);
-                    //         }
-                    //         logError("INFURA_API_KEYS: ", INFURA_API_KEYS[web3s.keyIndex]);
-                    //     } else if (err.message === 'Invalid JSON RPC response: {"size":0,"timeout":0}') {
-                    //         // ioemit("count_query", { error: "get balance error: " + err.message, RUN: false });
-                    //     }
+                    }).catch(err => {
+                        logError("get balance error: ", err.message);
+                        RUN = false;
+                        if (err.message === 'Returned error: daily request count exceeded, request rate limited') {
+                            if (current_INFURA_API_KEYS_index >= (INFURA_API_KEYS.length - 1)) {
+                                // when all keys exceeded, set time run again next day
+                            } else {
+                                initWeb3(current_INFURA_API_KEYS_index++);
+                            }
+                            logError("INFURA_API_KEYS exceeded: ", INFURA_API_KEYS[web3s.keyIndex]);
+                        } else {
 
-                    //     ioemit("count_query", { error: `get balance error: ${err.message} - ${INFURA_API_KEYS[web3s.keyIndex]}`, RUN: RUN });
-                    // })
-                }, 100 * web3Index);
+                        }
+                        ioemit("count_query", { error: `get balance error: ${err.message} - ${INFURA_API_KEYS[web3s.keyIndex]}`, RUN: RUN });
+                    })
+                }, 10 * web3Index);
             })
         })
-        .then((list) => setTimeout(() => {
+        .then((allChains) => setTimeout(() => {
             scanWallets()
         }, TIMEOUT_QUERY))
         .catch(err => {
@@ -232,7 +222,7 @@ function timerRun() {
 
 /*******/
 /* init app */
-loadInfuraAPIKeys().then(keys=> initWeb3())
+loadInfuraAPIKeys().then(keys => initWeb3())
     .then(getDailyTimeRun()
         .then(timerRun))
 
@@ -249,11 +239,12 @@ io.on('connection', async (_socket) => {
             case 'pause_now':
                 RUN = false;
                 break;
-            case "get_state":
+            case "get":
                 break;
         }
         socket.emit("count_query", {
             "RUN": RUN,
+            "count_query": count_query,
         });
         // log("count_query", msg, RUN);
     });
@@ -262,17 +253,22 @@ io.on('connection', async (_socket) => {
         switch (msg.command) {
             case "set":
                 setDailyTimeRun(msg.DAILY_TIME_RUN)
+                socket.emit("DAILY_TIME_RUN", {
+                    status: "SUCCESS", DAILY_TIME_RUN: DAILY_TIME_RUN, message: "set DAILY_TIME_RUN success"
+                })
                 log(msg)
                 break;
+            case "get":
+                socket.emit("DAILY_TIME_RUN", { "DAILY_TIME_RUN": DAILY_TIME_RUN })
+                break;
         }
-        socket.emit("DAILY_TIME_RUN", { "DAILY_TIME_RUN": DAILY_TIME_RUN })
     });
 
     socket.on("INFURA_API_KEYS", (msg) => {
         if (msg.command)
             switch (msg.command) {
                 case "get":
-                    socket.emit("INFURA_API_KEYS", { INFURA_API_KEYS: INFURA_API_KEYS });
+                    socket.emit("INFURA_API_KEYS", { INFURA_API_KEYS: INFURA_API_KEYS, current_INFURA_API_KEYS_index: current_INFURA_API_KEYS_index });
                     break;
                 case "set":
                     log(msg.INFURA_API_KEYS);

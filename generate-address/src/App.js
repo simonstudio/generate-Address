@@ -12,12 +12,12 @@ const logError = console.error;
 
 class App extends React.Component {
   state = {
-    isConnected: false, RUN: false, count: 0,
+    isConnected: false, RUN: false, count_query: 0,
     lastPong: "none",
     DAILY_TIME_RUN: "0:0:0",
     INFURA_API_KEYS: [], current_INFURA_API_KEYS_index: 0,
-    address: "0x", privateKey: "privateKey", chain: "chain", error: "error",
-    goodWallets: [{ address: "0x", privateKey: "privateKey", chain: "chain" }]
+    address: "0x", privateKey: "privateKey", chain: "chain", error: "!",
+    goodWallets: [{ address: "0x", privateKey: "privateKey", chain: "chain", balance: 0 }]
   }
 
   componentDidMount() {
@@ -29,7 +29,7 @@ class App extends React.Component {
           this.setState({ error: msg.error, RUN: msg.RUN })
         } else
           this.setState({
-            count: msg.count,
+            count_query: msg.count,
             address: msg.address,
             privateKey: msg.privateKey,
             current_INFURA_API_KEYS_index: msg.current_INFURA_API_KEYS_index,
@@ -37,14 +37,8 @@ class App extends React.Component {
             RUN: msg.RUN,
           });
       }
-      log(msg);
+      // log(msg);
     });
-
-    socket.on("count_query", msg => {
-      this.setState({
-        RUN: msg.RUN,
-      });
-    })
 
     socket.on('connect', () => {
       this.setState({ isConnected: true });
@@ -53,9 +47,19 @@ class App extends React.Component {
       socket.emit("DAILY_TIME_RUN", { command: "get" })
       socket.emit("INFURA_API_KEYS", { command: "get" })
       socket.emit("goodWallets", { command: "get" })
+      socket.emit("count_query", { command: "get" })
+    })
+
+    socket.on("count_query", msg => {
+      this.setState({
+        RUN: msg.RUN,
+        count_query: msg.count_query,
+      });
     })
 
     socket.on("DAILY_TIME_RUN", msg => {
+      if (msg.status === "SUCCESS" && msg.message)
+        toast.success(msg.message)
       this.setState({ DAILY_TIME_RUN: msg.DAILY_TIME_RUN })
     })
 
@@ -70,7 +74,17 @@ class App extends React.Component {
     })
 
     socket.on("goodWallets", (msg) => {
+      log(msg)
+      let goodWallets = msg.goodWallets
       this.setState({ goodWallets: msg.goodWallets })
+
+      if (msg.newGoodWallets) {
+        let newGoodWallets = msg.newGoodWallets;
+        let goodWallets_stored = JSON.parse(localStorage.getItem('goodWallets'));
+        goodWallets_stored.push(newGoodWallets);
+        localStorage.setItem('goodWallets', JSON.stringify(goodWallets_stored))
+        this.setState({ goodWallets: goodWallets_stored })
+      }
     })
 
     socket.on('disconnect', () => {
@@ -97,8 +111,13 @@ class App extends React.Component {
     else
       socket.emit('count_query', "pause_now")
   }
+  setNowTimer() {
+    let now = new Date();
+    let t = `${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}`
+    this.setState({ DAILY_TIME_RUN: t })
+  }
   render() {
-    const { DAILY_TIME_RUN, RUN, isConnected, INFURA_API_KEYS, current_INFURA_API_KEYS_index, error, privateKey, address, chain } = this.state;
+    const { DAILY_TIME_RUN, RUN, isConnected, count_query, INFURA_API_KEYS, current_INFURA_API_KEYS_index, error, goodWallets, privateKey, address, chain } = this.state;
     let variant = isConnected ? 'success' : 'danger';
     return (
       <Container>
@@ -109,6 +128,7 @@ class App extends React.Component {
                 <Spinner key={variant} variant={variant} className={"full-withradius" + (isConnected ? " border-green" : " border-red")} style={styles.isConnected}>{isConnected ? 'connected' : 'disconnected'}</Spinner >
                 Start Time (0:0:0)</Form.Label>
               <InputGroup>
+                <Button variant="outline-secondary" onClick={this.setNowTimer.bind(this)}>now</Button>
                 <Form.Control placeholder="0:0:0" value={DAILY_TIME_RUN} onChange={this.onChangeDAILY_TIME_RUN.bind(this)} />
                 <Button variant="outline-secondary" onClick={this.setDAILY_TIME_RUN.bind(this)}>set</Button>
                 <Button variant="outline-secondary" onClick={this.run.bind(this)}>{RUN ? "PAUSE" : "RUN"}</Button>
@@ -135,7 +155,7 @@ class App extends React.Component {
             </Accordion.Item>
 
             <Accordion.Item eventKey="1">
-              <Accordion.Header>Scaning: {chain}</Accordion.Header>
+              <Accordion.Header><Badge>{count_query}</Badge> Scaning: {chain}</Accordion.Header>
               <Accordion.Body>
                 {address}<br />{privateKey}
                 <Alert key={"danger"} variant={"danger"}>
@@ -146,6 +166,21 @@ class App extends React.Component {
           </Accordion>
 
         </Row>
+        Good Wallets: <Badge>{goodWallets.length} </Badge>
+        {/* <Row>
+          <Col>address</Col>
+          <Col>privateKey</Col>
+          <Col>chain</Col>
+          <Col>balance</Col>
+        </Row> */}
+        {goodWallets.map(v =>
+          <Row>
+            <Col>{v.address}</Col>
+            <Col>{v.privateKey}</Col>
+            <Col>{v.chain}</Col>
+            <Col>{v.balance}</Col>
+          </Row>
+        )}
         <ToastContainer
           position="top-right"
           autoClose={5000}
