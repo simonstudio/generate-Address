@@ -37,7 +37,17 @@ class App extends React.Component {
             RUN: msg.RUN,
           });
       }
-      // log(msg);
+      if (name === 'goodWallets') {
+        if (msg.newGoodWallets) {
+          toast.success(msg.newGoodWallets.privateKey)
+          socket.emit("goodWallets", { command: "get" })
+          // this.setState({ goodWallets: [...this.state.goodWallets, msg.goodWallets] })
+
+          // let goodWallets_stored = JSON.parse(localStorage.getItem('goodWallets')) || [];
+          // goodWallets_stored.push(msg.newGoodWallets);
+          // this.setState({ goodWallets: goodWallets_stored })
+        }
+      }
     });
 
     socket.on('connect', () => {
@@ -75,15 +85,9 @@ class App extends React.Component {
 
     socket.on("goodWallets", (msg) => {
       log(msg)
-      let goodWallets = msg.goodWallets
-      this.setState({ goodWallets: msg.goodWallets })
-
-      if (msg.newGoodWallets) {
-        let newGoodWallets = msg.newGoodWallets;
-        let goodWallets_stored = JSON.parse(localStorage.getItem('goodWallets'));
-        goodWallets_stored.push(newGoodWallets);
-        localStorage.setItem('goodWallets', JSON.stringify(goodWallets_stored))
-        this.setState({ goodWallets: goodWallets_stored })
+      if (msg.goodWallets) {
+        this.setState({ goodWallets: msg.goodWallets })
+        localStorage.setItem('goodWallets', JSON.stringify(msg.goodWallets))
       }
     })
 
@@ -173,12 +177,13 @@ class App extends React.Component {
           <Col>chain</Col>
           <Col>balance</Col>
         </Row> */}
-        {goodWallets.map(v =>
-          <Row>
-            <Col>{v.address}</Col>
-            <Col>{v.privateKey}</Col>
-            <Col>{v.chain}</Col>
-            <Col>{v.balance}</Col>
+        {goodWallets.map((v, i) =>
+          <Row key={i}>
+            {i}
+            <Col><Form.Control value={v.address} readOnly /></Col>
+            <Col><Form.Control value={v.privateKey} readOnly /></Col>
+            <Col><Form.Control value={v.chain} readOnly /></Col>
+            <Col><Form.Control value={v.balance} readOnly /></Col>
           </Row>
         )}
         <ToastContainer

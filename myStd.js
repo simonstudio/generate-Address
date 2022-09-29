@@ -34,5 +34,7 @@ function logSuccess() {
 function logError() {
     console.log(COLOR.FgRed, Object.values(arguments).join(" "), COLOR.Reset)
 };
-
-module.exports = { COLOR, log, logSuccess, logError };
+function logWaning() {
+    console.log(COLOR.FgYellow, Object.values(arguments).join(" "), COLOR.Reset)
+};
+module.exports = { COLOR, log, logSuccess, logError, logWaning };
