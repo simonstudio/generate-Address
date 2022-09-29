@@ -81,14 +81,17 @@ function setDailyTimeRun(dailyTime = DAILY_TIME_RUN, file = DAILY_TIME_RUN_FILE)
 }
 
 function getDailyTimeRun(file = DAILY_TIME_RUN_FILE) {
-    fs.readFile(file, 'utf8', function (err, dailyTime) {
-        if (err)
-            logError("getDailyTimeRun error: ", err);
-        else {
-            DAILY_TIME_RUN = dailyTime;
-            logSuccess(clc.yellow.bgRed(` ${dailyTime} `));
-        }
-    });
+    return new Promise((rs, rj) => {
+        fs.readFile(file, 'utf8', function (err, dailyTime) {
+            if (err) {
+                rj(err)
+            } else {
+                DAILY_TIME_RUN = dailyTime;
+                logSuccess(clc.yellow.bgRed(` ${dailyTime} `));
+                rs(DAILY_TIME_RUN)
+            }
+        });
+    })
 }
 
 function loadInfuraAPIKeys(pathToFile = 'infurakeys.txt') {
@@ -105,8 +108,9 @@ function loadInfuraAPIKeys(pathToFile = 'infurakeys.txt') {
     })
 }
 
-function initWeb3(index = 0) {
+async function initWeb3(index = 0) {
     current_INFURA_API_KEYS_index = index;
+    log(index)
     web3s = INFURA.map(link => {
         const provider = new Web3.providers.HttpProvider(link + INFURA_API_KEYS[index]);
         return new Web3(provider);
@@ -176,6 +180,7 @@ const scanWallets = () => {
                         chain: (new URL(web3._provider.host)).host.split(".")[0],
                         RUN: RUN,
                     });
+
                     // log(web3s[web3Index]._provider.host);
                     return web3.eth.getBalance(a.address).then(balance => {
                         // log(balance);
@@ -187,20 +192,20 @@ const scanWallets = () => {
                     }).catch(err => {
                         logError("get balance error: ", err.message);
                         RUN = false;
-                        if (err.message === 'Invalid JSON RPC response: {"size":0,"timeout":0}' ||
-                            err.message === 'Returned error: daily request count exceeded, request rate limited') {
-                            if (web3s.keyIndex >= (INFURA_API_KEYS.length - 1)) {
+                        if (err.message === 'Returned error: daily request count exceeded, request rate limited') {
+                            if (current_INFURA_API_KEYS_index >= (INFURA_API_KEYS.length - 1)) {
                                 // when all keys exceeded, set time run again next day
                             } else {
-                                initWeb3(web3s.keyIndex + 1);
+                                initWeb3(current_INFURA_API_KEYS_index++);
                             }
-                            logError("web3s api key: ", INFURA_API_KEYS[web3s.keyIndex]);
-                        } else {
+                            logError("INFURA_API_KEYS: ", INFURA_API_KEYS[web3s.keyIndex]);
+                        } else if (err.message === 'Invalid JSON RPC response: {"size":0,"timeout":0}') {
                             // ioemit("count_query", { error: "get balance error: " + err.message, RUN: false });
                         }
+
                         ioemit("count_query", { error: `get balance error: ${err.message} - ${INFURA_API_KEYS[web3s.keyIndex]}`, RUN: RUN });
                     })
-                }, 100);
+                }, 100 * web3Index);
             })
         })
         .then((list) => setTimeout(() => {
@@ -224,12 +229,11 @@ function timerRun() {
     }, 1000)
 }
 
-
-loadInfuraAPIKeys()
-getDailyTimeRun()
-timerRun()
-
-initWeb3()
+/*******/
+/* init app */
+loadInfuraAPIKeys().then(keys=> initWeb3())
+    .then(getDailyTimeRun()
+        .then(timerRun))
 
 io.on('connection', async (_socket) => {
     socket = _socket;
@@ -284,3 +288,11 @@ io.on('connection', async (_socket) => {
         })
     });
 });
+
+// let mylink = INFURA[0] + INFURA_API_KEYS[5]
+// logError(mylink)
+// const myprovider = new Web3.providers.HttpProvider(mylink);
+// (new Web3(myprovider)).eth.getBalance("0x554f4476825293d4ad20e02b54aca13956acc40a").then(balance => {
+//     logSuccess(balance, '0x554f4476825293d4ad20e02b54aca13956acc40a')
+// })
+
