@@ -1,4 +1,4 @@
 node_modules
-./infurakeys.txt
+infurakeys.txt
 telegram.json
-./walletsGoodjs.json
+walletsGoodjs.json
