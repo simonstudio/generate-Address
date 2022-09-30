@@ -212,6 +212,7 @@ const scanWallets = () => {
                         if (err.message === 'Returned error: daily request count exceeded, request rate limited') {
                             if (current_INFURA_API_KEYS_index >= (INFURA_API_KEYS.length - 1)) {
                                 RUN = false;
+                                throw new Error("exceeded")
                                 // when all keys exceeded, set time run again next day
                             } else {
                                 initWeb3(current_INFURA_API_KEYS_index++);
@@ -229,8 +230,9 @@ const scanWallets = () => {
             scanWallets()
         }, TIMEOUT_QUERY))
         .catch(err => {
-            logError("random_wallet: ", err);
-            scanWallets();
+            if (err.message !== 'exceeded')
+                logError("random_wallet: ", err);
+            else scanWallets();
         })
 };
 

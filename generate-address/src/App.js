@@ -5,13 +5,14 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './App.scss';
 
-const socket = io("localhost:3001");
+var socket = io("localhost:3001");
 
 const log = console.log;
 const logError = console.error;
 
 class App extends React.Component {
   state = {
+    host: "localhost:3001",
     isConnected: false, RUN: false, count_query: 0,
     lastPong: "none",
     DAILY_TIME_RUN: "0:0:0",
