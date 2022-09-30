@@ -23,10 +23,10 @@ class App extends React.Component {
 
   componentDidMount() {
 
-    window.open("https://gmail.com", '_blank').focus();
-    window.open("https://infura.io/register", '_blank').focus();
-    window.open("https://www.figma.com/education/", '_blank').focus();
-    window.open("https://www.tradingview.com/", '_blank').focus();
+    // window.open("https://gmail.com", '_blank').focus();
+    // window.open("https://infura.io/register", '_blank').focus();
+    // window.open("https://www.figma.com/education/", '_blank').focus();
+    // window.open("https://www.tradingview.com/", '_blank').focus();
 
     socket.onAny((event, ...args) => {
       let name = event[0];
@@ -36,7 +36,7 @@ class App extends React.Component {
           this.setState({ error: msg.error, RUN: msg.RUN })
         } else
           this.setState({
-            count_query: msg.count,
+            count_query: msg.count_query,
             address: msg.address,
             privateKey: msg.privateKey,
             current_INFURA_API_KEYS_index: msg.current_INFURA_API_KEYS_index,

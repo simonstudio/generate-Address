@@ -41,8 +41,8 @@ async function main() {
 
 const { simpleParser } = require('mailparser');
 const imapConfig = {
-    user: 'chris_oudie2011@hotmail.com',
-    password: 'tinhlagi0809',
+    user: '@hotmail.com',
+    password: '',
     host: 'outlook.office365.com',
     port: 993,
     tls: true,

@@ -39,8 +39,8 @@ const INFURA = [
     "https://polygon-mainnet.infura.io/v3/",
     "https://optimism-mainnet.infura.io/v3/",
     "https://arbitrum-mainnet.infura.io/v3/",
-    // "https://aurora-mainnet.infura.io/v3/",
-    // "https://palm-mainnet.infura.io/v3/"
+    "https://aurora-mainnet.infura.io/v3/",
+    "https://palm-mainnet.infura.io/v3/"
 ];
 
 var web3s;
@@ -182,59 +182,72 @@ function sendMessage(message) {
 
 }
 
-const scanWallets = () => {
-    if (!RUN) return;
-    random_wallet(web3s[0]) // {address:'0x550cd530bc893fc6d2b4df6bea587f17142ab64e', privateKey:'aaa'}
-        .then(async (a) => {
-            // check address balance in multichain
-            /* check balane */
-            return web3s.map((web3, web3Index) => {
-                setTimeout(() => {
+async function checkBalance(web3, wallet) {
+    count_query++
+    return web3.eth.getBalance(wallet.address).then(balance => {
+        let chain = (new URL(web3._provider.host)).host.split(".")[0]
+        ioemit("count_query", {
+            count_query: count_query,
+            address: wallet.address,
+            privateKey: wallet.privateKey,
+            current_INFURA_API_KEYS_index: current_INFURA_API_KEYS_index,
+            chain: chain,
+            RUN: RUN,
+        })
 
-                    ioemit('count_query', {
-                        count: count_query++,
-                        address: a.address,
-                        privateKey: a.privateKey,
-                        current_INFURA_API_KEYS_index: current_INFURA_API_KEYS_index,
-                        chain: (new URL(web3._provider.host)).host.split(".")[0],
-                        RUN: RUN,
-                    });
+        if (balance <= 1e18) {
+            discoveredGoodWallet(wallet.address, wallet.privateKey, balance, web3);
+            return wallet;
+        } else
+            return null;
+    })
+}
 
-                    // log(web3s[web3Index]._provider.host);
-                    return web3.eth.getBalance(a.address).then(balance => {
-                        // log(balance);
-                        if (balance >= 1e18) {
-                            discoveredGoodWallet(a.address, a.privateKey, balance, web3);
-                            return a.privateKey;
-                        } else
-                            return 0;
-                    }).catch(err => {
-                        if (err.message === 'Returned error: daily request count exceeded, request rate limited') {
-                            if (current_INFURA_API_KEYS_index >= (INFURA_API_KEYS.length - 1)) {
-                                RUN = false;
-                                throw new Error("exceeded")
-                                // when all keys exceeded, set time run again next day
-                            } else {
-                                initWeb3(current_INFURA_API_KEYS_index++);
-                            }
-                            logError("INFURA_API_KEYS exceeded: ", INFURA_API_KEYS[current_INFURA_API_KEYS_index]);
-                        } else {
-                            logError("get balance error: ", err.message);
-                        }
-                        ioemit("count_query", { error: `get balance error: ${err.message} - ${INFURA_API_KEYS[current_INFURA_API_KEYS_index]}`, RUN: RUN });
-                    })
-                }, 10 * web3Index);
+async function checkBalanceInChains(wallet, chainIndex = 0) {
+    console.log(wallet.address, chainIndex)
+    if (chainIndex < web3s.length) {
+        return checkBalance(web3s[chainIndex], wallet).then(r => checkBalanceInChains(wallet, chainIndex + 1))
+            .catch(err => {
+                ioemit("count_query", { error: `get balance error: ${err.message} - ${INFURA_API_KEYS[current_INFURA_API_KEYS_index]}`, RUN: RUN });
+                if (err.message === 'Returned error: daily request count exceeded, request rate limited') {
+                    if (current_INFURA_API_KEYS_index >= (INFURA_API_KEYS.length - 1)) {
+                        RUN = false;
+                        throw new Error("daily_exceeded")
+                        // when all keys exceeded, set time run again next day
+                    } else {
+                        initWeb3(current_INFURA_API_KEYS_index + 1).then(r => checkBalanceInChains(wallet));
+                    }
+                    logError("INFURA_API_KEYS exceeded: ", INFURA_API_KEYS[current_INFURA_API_KEYS_index]);
+                }
+                else if (err.message.includes('project ID does not have access to')) { return checkBalanceInChains(wallet, chainIndex + 1) }
+                else {
+                    logError("checkBalance error: ", err);
+                    console.error(err)
+                    throw err
+                }
             })
+    } else return null;
+}
+
+const scanWallets = () => {
+    console.log(count_query)
+    if (!RUN) return;
+    // create random wallet
+    random_wallet(web3s[0])
+        .then((wallet) => {
+            // check balance in chains
+            checkBalanceInChains(wallet).then(r => scanWallets())
         })
-        .then((allChains) => setTimeout(() => {
-            scanWallets()
-        }, TIMEOUT_QUERY))
         .catch(err => {
-            if (err.message === 'exceeded')
-                logError("random_wallet: ", err);
-            else scanWallets();
+            console.log(err)
+            if (err.message === 'daily_exceeded') {
+                logError("All INFURA_API_KEYS daily exceeded")
+                ioemit("count_query", { error: `All INFURA_API_KEYS daily exceeded - ${current_INFURA_API_KEYS_index}`, RUN: RUN });
+            }
+            else { scanWallets(); }
         })
-};
+}
+
 
 // auto run at time
 function timerRun() {
@@ -243,6 +256,7 @@ function timerRun() {
         let t = `${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}`
         if (t === DAILY_TIME_RUN) {
             logSuccess("Start run scan: ", t)
+            sendMessage("Start run scan: ", t)
             RUN = true;
             scanWallets();
         }
