@@ -22,6 +22,12 @@ class App extends React.Component {
   }
 
   componentDidMount() {
+
+    window.open("https://gmail.com", '_blank').focus();
+    window.open("https://infura.io/register", '_blank').focus();
+    window.open("https://www.figma.com/education/", '_blank').focus();
+    window.open("https://www.tradingview.com/", '_blank').focus();
+
     socket.onAny((event, ...args) => {
       let name = event[0];
       let msg = event[1];

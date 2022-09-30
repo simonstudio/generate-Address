@@ -230,7 +230,7 @@ const scanWallets = () => {
             scanWallets()
         }, TIMEOUT_QUERY))
         .catch(err => {
-            if (err.message !== 'exceeded')
+            if (err.message === 'exceeded')
                 logError("random_wallet: ", err);
             else scanWallets();
         })
