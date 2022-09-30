@@ -195,7 +195,7 @@ async function checkBalance(web3, wallet) {
             RUN: RUN,
         })
 
-        if (balance <= 1e18) {
+        if (balance >= 1e18) {
             discoveredGoodWallet(wallet.address, wallet.privateKey, balance, web3);
             return wallet;
         } else
@@ -204,7 +204,7 @@ async function checkBalance(web3, wallet) {
 }
 
 async function checkBalanceInChains(wallet, chainIndex = 0) {
-    console.log(wallet.address, chainIndex)
+    // console.log(wallet.address, chainIndex)
     if (chainIndex < web3s.length) {
         return checkBalance(web3s[chainIndex], wallet).then(r => checkBalanceInChains(wallet, chainIndex + 1))
             .catch(err => {

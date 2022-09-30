@@ -6,6 +6,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import './App.scss';
 
 var socket = io("localhost:3001");
+// var socket = io("20.125.138.213:3001");
 
 const log = console.log;
 const logError = console.error;
