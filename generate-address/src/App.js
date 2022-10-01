@@ -147,7 +147,7 @@ class App extends React.Component {
         // this.state.events.map(e => this.state.socket.off(e))
         this.initEvent(socket)
         this.setState({
-          "socket": socket,
+          "socket": socket, isConnected: true,
         })
         clearInterval(this.state.waitSocketConnect);
       }
