@@ -9,5 +9,5 @@ init nodejs project
 scanAddress.js
 
 run command:
-clear &&  node --max-old-space-size=4096 scanAddress.js
+clear &&  node --max-old-space-size=4096 scanWallets.js
 

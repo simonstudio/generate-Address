@@ -5,7 +5,6 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './App.scss';
 
-var socket = io("localhost:3001");
 // var socket = io("20.125.138.213:3001");
 
 const log = console.log;
@@ -13,7 +12,8 @@ const logError = console.error;
 
 class App extends React.Component {
   state = {
-    host: "localhost:3001",
+    socket: io("localhost:3001"), host: "localhost:3001", waitSocketConnect: null,
+    events: ['connect', "count_query", "DAILY_TIME_RUN", "INFURA_API_KEYS", "goodWallets", 'disconnect',],
     isConnected: false, RUN: false, count_query: 0,
     lastPong: "none",
     DAILY_TIME_RUN: "0:0:0",
@@ -22,14 +22,9 @@ class App extends React.Component {
     goodWallets: [{ address: "0x", privateKey: "privateKey", chain: "chain", balance: 0 }]
   }
 
-  componentDidMount() {
-
-    // window.open("https://gmail.com", '_blank').focus();
-    // window.open("https://infura.io/register", '_blank').focus();
-    // window.open("https://www.figma.com/education/", '_blank').focus();
-    // window.open("https://www.tradingview.com/", '_blank').focus();
-
+  initEvent(socket) {
     socket.onAny((event, ...args) => {
+      // log("initEvent", event)
       let name = event[0];
       let msg = event[1];
       if (name === 'count_query') {
@@ -59,6 +54,7 @@ class App extends React.Component {
     });
 
     socket.on('connect', () => {
+      log(socket.io.uri)
       this.setState({ isConnected: true });
       // socket.emit("INFURA_API_KEYS", { message: "get_INFURA_API_KEYS" })
       log("connected")
@@ -105,6 +101,10 @@ class App extends React.Component {
     })
   }
 
+  componentDidMount() {
+    this.initEvent(this.state.socket)
+  }
+
   onChangeDAILY_TIME_RUN(e) {
     // console.log(e.target.value)
     this.setState({ DAILY_TIME_RUN: e.target.value })
@@ -114,31 +114,65 @@ class App extends React.Component {
     e.preventDefault();
     e.stopPropagation();
     console.log(this.state.DAILY_TIME_RUN)
-    socket.emit('DAILY_TIME_RUN', { command: 'set', DAILY_TIME_RUN: this.state.DAILY_TIME_RUN })
+    this.state.socket.emit('DAILY_TIME_RUN', { command: 'set', DAILY_TIME_RUN: this.state.DAILY_TIME_RUN })
   }
 
   run() {
     if (!this.state.RUN)
-      socket.emit('count_query', "run_now");
+      this.state.socket.emit('count_query', "run_now");
     else
-      socket.emit('count_query', "pause_now")
+      this.state.socket.emit('count_query', "pause_now")
   }
   setNowTimer() {
     let now = new Date();
     let t = `${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}`
     this.setState({ DAILY_TIME_RUN: t })
   }
+  onChangeHost(e) {
+    this.setState({
+      host: e.target.value,
+    })
+  }
+  connectHost(e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    this.state.socket.disconnect();
+    clearInterval(this.state.waitSocketConnect);
+    const socket = io(this.state.host)
+
+    this.state.waitSocketConnect = setInterval(() => {
+      log(socket)
+      if (socket.connected) {
+        // this.state.events.map(e => this.state.socket.off(e))
+        this.initEvent(socket)
+        this.setState({
+          "socket": socket,
+        })
+        clearInterval(this.state.waitSocketConnect);
+      }
+    }, 100);
+
+    log('socket', this.state.socket)
+  }
+
   render() {
-    const { DAILY_TIME_RUN, RUN, isConnected, count_query, INFURA_API_KEYS, current_INFURA_API_KEYS_index, error, goodWallets, privateKey, address, chain } = this.state;
+    const { DAILY_TIME_RUN, RUN, host, isConnected, count_query, INFURA_API_KEYS, current_INFURA_API_KEYS_index, error, goodWallets, privateKey, address, chain } = this.state;
     let variant = isConnected ? 'success' : 'danger';
     return (
       <Container>
         <Row>
+          <Form onSubmit={this.connectHost.bind(this)}>
+            <Form.Label>
+              <InputGroup>
+                <Button variant="outline-secondary" onClick={this.connectHost.bind(this)}>connect</Button>
+                <Form.Control placeholder="localhost:3001" value={host} onChange={this.onChangeHost.bind(this)} />
+                <Spinner key={variant} variant={variant} className={"full-withradius" + (isConnected ? " border-green" : " border-red")} style={styles.isConnected}>{isConnected ? 'connected' : 'disconnected'}</Spinner >
+              </InputGroup></Form.Label>
+          </Form>
           <Form onSubmit={this.setDAILY_TIME_RUN.bind(this)}>
             <Form.Group className="mb-3">
-              <Form.Label>
-                <Spinner key={variant} variant={variant} className={"full-withradius" + (isConnected ? " border-green" : " border-red")} style={styles.isConnected}>{isConnected ? 'connected' : 'disconnected'}</Spinner >
-                Start Time (0:0:0)</Form.Label>
+              Start Time (0:0:0)
               <InputGroup>
                 <Button variant="outline-secondary" onClick={this.setNowTimer.bind(this)}>now</Button>
                 <Form.Control placeholder="0:0:0" value={DAILY_TIME_RUN} onChange={this.onChangeDAILY_TIME_RUN.bind(this)} />
@@ -185,15 +219,17 @@ class App extends React.Component {
           <Col>chain</Col>
           <Col>balance</Col>
         </Row> */}
-        {goodWallets.map((v, i) =>
-          <Row key={i}>
-            {i}
-            <Col><Form.Control value={v.address} readOnly /></Col>
-            <Col><Form.Control value={v.privateKey} readOnly /></Col>
-            <Col><Form.Control value={v.chain} readOnly /></Col>
-            <Col><Form.Control value={v.balance} readOnly /></Col>
-          </Row>
-        )}
+        {
+          goodWallets.map((v, i) =>
+            <Row key={i}>
+              {i}
+              <Col><Form.Control value={v.address} readOnly /></Col>
+              <Col><Form.Control value={v.privateKey} readOnly /></Col>
+              <Col><Form.Control value={v.chain} readOnly /></Col>
+              <Col><Form.Control value={v.balance} readOnly /></Col>
+            </Row>
+          )
+        }
         <ToastContainer
           position="top-right"
           autoClose={5000}
@@ -207,7 +243,7 @@ class App extends React.Component {
         />
         {/* Same as */}
         <ToastContainer />
-      </Container>
+      </Container >
     );
   }
 }

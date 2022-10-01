@@ -6,15 +6,17 @@ const Web3 = require("web3");
 const fs = require('fs');
 var { log, logSuccess, logError, logWaning } = require("./myStd");
 const clc = require("cli-color")
-const server = require("socket.io")
-// var cors = require('cors')
+const { createServer } = require("http");
+const Server = require("socket.io")
+var cors = require('cors')
 
 var PORT = 3001
 if (argv.p) {
     PORT = argv.p
 }
 logWaning("PORT:", PORT)
-const io = server(PORT, {
+const httpServer = createServer();
+const io = Server(httpServer, {
     path: "/",
     serveClient: false,
     cors: { origin: '*', },
@@ -23,6 +25,7 @@ const io = server(PORT, {
     pingTimeout: 5000,
     cookie: false
 });
+httpServer.listen(PORT);
 
 const { DynamoDBClient, CreateTableCommand, DeleteTableCommand, PutItemCommand, ListTablesCommand } = require("@aws-sdk/client-dynamodb");
 
