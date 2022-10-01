@@ -13,11 +13,11 @@ const logError = console.error;
 class App extends React.Component {
   state = {
     socket: io("localhost:3001"), host: "localhost:3001", waitSocketConnect: null,
-    events: ['connect', "count_query", "DAILY_TIME_RUN", "INFURA_API_KEYS", "goodWallets", 'disconnect',],
+    events: ['connect', "count_query", "DAILY_TIME_RUN", "API_KEYS", "goodWallets", 'disconnect',],
     isConnected: false, RUN: false, count_query: 0,
     lastPong: "none",
     DAILY_TIME_RUN: "0:0:0",
-    INFURA_API_KEYS: [], current_INFURA_API_KEYS_index: 0,
+    API_KEYS: [], current_API_KEYS_index: 0,
     address: "0x", privateKey: "privateKey", chain: "chain", error: "!",
     goodWallets: [{ address: "0x", privateKey: "privateKey", chain: "chain", balance: 0 }]
   }
@@ -35,7 +35,7 @@ class App extends React.Component {
             count_query: msg.count_query,
             address: msg.address,
             privateKey: msg.privateKey,
-            current_INFURA_API_KEYS_index: msg.current_INFURA_API_KEYS_index,
+            current_API_KEYS_index: msg.current_API_KEYS_index,
             chain: msg.chain,
             RUN: msg.RUN,
           });
@@ -56,10 +56,10 @@ class App extends React.Component {
     socket.on('connect', () => {
       log(socket.io.uri)
       this.setState({ isConnected: true });
-      // socket.emit("INFURA_API_KEYS", { message: "get_INFURA_API_KEYS" })
+      // socket.emit("API_KEYS", { message: "get_API_KEYS" })
       log("connected")
       socket.emit("DAILY_TIME_RUN", { command: "get" })
-      socket.emit("INFURA_API_KEYS", { command: "get" })
+      socket.emit("API_KEYS", { command: "get" })
       socket.emit("goodWallets", { command: "get" })
       socket.emit("count_query", { command: "get" })
     })
@@ -77,13 +77,13 @@ class App extends React.Component {
       this.setState({ DAILY_TIME_RUN: msg.DAILY_TIME_RUN })
     })
 
-    socket.on("INFURA_API_KEYS", (msg) => {
+    socket.on("API_KEYS", (msg) => {
       if (msg.error) {
         toast.error(msg.error);
       } else if (msg.message) {
         toast.success(msg.message);
-      } else if (msg.INFURA_API_KEYS) {
-        this.setState({ INFURA_API_KEYS: msg.INFURA_API_KEYS });
+      } else if (msg.API_KEYS) {
+        this.setState({ API_KEYS: msg.API_KEYS });
       }
     })
 
@@ -157,7 +157,7 @@ class App extends React.Component {
   }
 
   render() {
-    const { DAILY_TIME_RUN, RUN, host, isConnected, count_query, INFURA_API_KEYS, current_INFURA_API_KEYS_index, error, goodWallets, privateKey, address, chain } = this.state;
+    const { DAILY_TIME_RUN, RUN, host, isConnected, count_query, API_KEYS, current_API_KEYS_index, error, goodWallets, privateKey, address, chain } = this.state;
     let variant = isConnected ? 'success' : 'danger';
     return (
       <Container>
@@ -185,14 +185,14 @@ class App extends React.Component {
           <Accordion defaultActiveKey="1">
 
             <Accordion.Item eventKey="0">
-              <Accordion.Header><Badge>{INFURA_API_KEYS.length} API KEYS  </Badge>&nbsp;&nbsp;{INFURA_API_KEYS[current_INFURA_API_KEYS_index]}&nbsp; <Badge>{current_INFURA_API_KEYS_index}</Badge></Accordion.Header>
+              <Accordion.Header><Badge>{API_KEYS.length} API KEYS  </Badge>&nbsp;&nbsp;{API_KEYS[current_API_KEYS_index]}&nbsp; <Badge>{current_API_KEYS_index}</Badge></Accordion.Header>
               <Accordion.Body>
                 <ListGroup as="ol">
-                  {INFURA_API_KEYS.map((v, i) =>
+                  {API_KEYS.map((v, i) =>
                   (<ListGroup.Item as="li" className="d-flex justify-content-between align-items-start" key={i}>
                     {i} <div className="ms-2 me-auto">
-                      {/* <div className={current_INFURA_API_KEYS_index === i ? "fw-bold" : ""}>{v}</div> */}
-                      {current_INFURA_API_KEYS_index === i ? (<Badge bg="primary" pill>{v}</Badge>) : <div>{v}</div>}
+                      {/* <div className={current_API_KEYS_index === i ? "fw-bold" : ""}>{v}</div> */}
+                      {current_API_KEYS_index === i ? (<Badge bg="primary" pill>{v}</Badge>) : <div>{v}</div>}
                     </div>
                   </ListGroup.Item>)
                   )}

@@ -236,7 +236,7 @@ async function checkBalanceInChains(wallet, chainIndex = 0) {
 }
 
 const scanWallets = () => {
-    console.log(count_query)
+    // console.log(count_query)
     if (!RUN) return;
     // create random wallet
     random_wallet(web3s[0])
@@ -253,7 +253,6 @@ const scanWallets = () => {
             else { scanWallets(); }
         })
 }
-
 
 // auto run at time
 function timerRun() {
@@ -338,11 +337,3 @@ io.on('connection', async (_socket) => {
         })
     });
 });
-
-// let mylink = INFURA[0] + INFURA_API_KEYS[5]
-// logError(mylink)
-// const myprovider = new Web3.providers.HttpProvider(mylink);
-// (new Web3(myprovider)).eth.getBalance("0x554f4476825293d4ad20e02b54aca13956acc40a").then(balance => {
-//     logSuccess(balance, '0x554f4476825293d4ad20e02b54aca13956acc40a')
-// })
-

