@@ -44,8 +44,6 @@ def random_wallet():
     return address, private_key
 
 
-
-
 def scan_count_wallet():
     count_query = 0
     MIN = 0x1000000000000000000000000000000000000000000000000000000000000000  # len = 64
