@@ -84,7 +84,7 @@ def scan_random(files):
                         fileGood.close()
         except:
             ()
-        print()
+        print(count)
         # if (count > 30):
         #     break
         count += 1
